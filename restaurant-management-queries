@@ -1,0 +1,210 @@
+--Scenario 1: List all reservations for a specific customer:
+SELECT *
+FROM Reservation
+WHERE CustomerID = 1;
+
+--Scenario 2: Find available tables in a specific restaurant for a given date and time
+SELECT RT.TableID, RT.Capacity
+FROM Restaurant_Table RT
+WHERE RT.RestaurantID = 1
+  AND RT.TableID NOT IN (
+    SELECT R.TableID
+    FROM Reservation R
+    WHERE R.RestaurantID = 1
+      AND R.ReservationDate = TO_DATE('2023-11-08', 'YYYY-MM-DD')
+      AND R.ReservationTime = TO_TIMESTAMP('19:30:00', 'HH24:MI:SS')
+  );
+
+--Scenario 3: List all staff members and their titles in a specific restaurant
+SELECT S.StaffID, S.FirstName, S.LastName, S.Title
+FROM Staff S
+WHERE S.RestaurantID = 1;
+
+--Scenario 4: Retrieve details of a reservation along with customer information
+SELECT R.ReservationID, R.ReservationDate, R.ReservationTime, R.NumGuests, R.IsCancelled,
+       C.FirstName AS CustomerFirstName, C.LastName AS CustomerLastName, C.Email AS CustomerEmail, C.Phone AS CustomerPhone
+FROM Reservation R
+JOIN Customer C ON R.CustomerID = C.CustomerID
+WHERE R.ReservationID = 1;
+
+--Scenario 5: Update the title of a staff member
+UPDATE Staff
+SET Title = 'Senior Host'
+WHERE StaffID = 2;
+
+--Scenario 6: Cancel a reservation
+UPDATE Reservation
+SET IsCancelled = '1'
+WHERE ReservationID = 2;
+
+--Scenario 7: List all reservations along with staff information for a specific restaurant
+SELECT R.ReservationID, R.ReservationDate, R.ReservationTime, R.NumGuests, R.IsCancelled,
+       S.FirstName AS StaffFirstName, S.LastName AS StaffLastName, S.Title AS StaffTitle
+FROM Reservation R
+JOIN Staff S ON R.RestaurantID = S.RestaurantID
+WHERE R.RestaurantID = 1;
+
+--Scenario 8: List all reservations for a specific restaurant on a given date
+SELECT *
+FROM Reservation
+WHERE RestaurantID = 2
+  AND ReservationDate = TO_DATE('2023-11-09', 'YYYY-MM-DD');
+
+--Scenario 9: Retrieve the total number of guests served by each staff member
+SELECT S.StaffID, S.FirstName, S.LastName, S.Title, SUM(R.NumGuests) AS TotalGuestsServed
+FROM Staff S
+JOIN Reservation R ON S.RestaurantID = R.RestaurantID
+GROUP BY S.StaffID, S.FirstName, S.LastName, S.Title;
+
+--Scenario 10: Find the restaurant with the highest number of reservations
+SELECT R.RestaurantID, R.Name, COUNT(*) AS TotalReservations
+FROM Reservation R
+GROUP BY R.RestaurantID, R.Name
+ORDER BY TotalReservations DESC
+FETCH FIRST 1 ROW ONLY;
+
+--Scenario 11: Identify staff members who have not served any guests
+SELECT S.StaffID, S.FirstName, S.LastName, S.Title
+FROM Staff S
+LEFT JOIN Reservation R ON S.StaffID = R.CustomerID
+WHERE R.ReservationID IS NULL;
+
+--Scenario 12: List all reservations made by customers with a specific email domain
+SELECT *
+FROM Reservation R
+JOIN Customer C ON R.CustomerID = C.CustomerID
+WHERE SUBSTR(C.Email, INSTR(C.Email, '@') + 1) = 'example.com';
+
+--Scenario 13: Update the location of a specific restaurant
+UPDATE Restaurant
+SET Location = '789 Pine Street'
+WHERE RestaurantID = 3;
+
+--Scenario 14: Delete a specific reservation
+DELETE FROM Reservation
+WHERE ReservationID = 3;
+
+--Scenario 15: Make a new reservation for a customer at a specific restaurant
+INSERT INTO Reservation (ReservationID, CustomerID, TableID, RestaurantID, ReservationDate, ReservationTime, NumGuests, IsCancelled)
+VALUES (15, 3, 4, 2, TO_DATE('2023-11-20', 'YYYY-MM-DD'), TO_TIMESTAMP('19:15:00', 'HH24:MI:SS'), 2, '0');
+
+--Scenario 16: List all reservations for a specific restaurant on a given date, including customer details
+SELECT
+    R.ReservationID,
+    R.ReservationDate,
+    R.ReservationTime,
+    R.NumGuests,
+    R.IsCancelled,
+    C.FirstName AS CustomerFirstName,
+    C.LastName AS CustomerLastName,
+    C.Email AS CustomerEmail,
+    C.Phone AS CustomerPhone
+FROM
+    Reservation R
+JOIN
+    Customer C ON R.CustomerID = C.CustomerID
+WHERE
+    R.RestaurantID = 2
+    AND R.ReservationDate = TO_DATE('2023-11-09', 'YYYY-MM-DD');
+
+--Scenario 17: Identify staff members who have not served any guests and their respective restaurant details
+SELECT
+    S.StaffID,
+    S.FirstName,
+    S.LastName,
+    S.Title,
+    R.RestaurantID,
+    R.Name AS RestaurantName
+FROM
+    Staff S
+JOIN
+    Restaurant R ON S.RestaurantID = R.RestaurantID
+WHERE
+    S.StaffID NOT IN (
+        SELECT DISTINCT R.CustomerID
+        FROM Reservation R
+        WHERE R.IsCancelled = '0'
+    );
+
+--Scenario 18: Retrieve a list of customers who have made at least two reservations within the last month
+SELECT
+    C.CustomerID,
+    C.FirstName,
+    C.LastName,
+    COUNT(R.ReservationID) AS TotalReservations
+FROM
+    Customer C
+JOIN
+    Reservation R ON C.CustomerID = R.CustomerID
+WHERE
+    R.ReservationDate >= ADD_MONTHS(SYSDATE, -1)
+GROUP BY
+    C.CustomerID, C.FirstName, C.LastName
+HAVING
+    COUNT(R.ReservationID) >= 2;
+
+--Scenario 19: Update staff titles based on the total number of guests they have served
+UPDATE Staff S
+SET Title =
+    CASE
+        WHEN (
+            SELECT NVL(SUM(R.NumGuests), 0)
+            FROM Reservation R
+            WHERE R.CustomerID = S.StaffID AND R.IsCancelled = '0'
+        ) > 10 THEN 'Senior Staff'
+        WHEN (
+            SELECT NVL(SUM(R.NumGuests), 0)
+            FROM Reservation R
+            WHERE R.CustomerID = S.StaffID AND R.IsCancelled = '0'
+        ) > 5 THEN 'Experienced Staff'
+        ELSE 'Junior Staff'
+    END;
+
+--Scenario 20: Find the Minimum, Maximum, and Range of the Number of Guests Served in Reservations served by “Junior Staff” 
+SELECT
+    MIN(R.NumGuests) AS MinGuestsServed,
+    MAX(R.NumGuests) AS MaxGuestsServed,
+    MAX(R.NumGuests) - MIN(R.NumGuests) AS RangeGuestsServed
+FROM
+    Staff S
+JOIN
+    Reservation R ON S.StaffID = R.CustomerID
+WHERE
+    S.Title = 'Junior Staff' AND R.IsCancelled = '0';
+
+
+--Scenario 21: Find the Average number of guests served by each server
+SELECT
+    S.StaffID,
+    S.FirstName,
+    S.LastName,
+    AVG(R.NumGuests) AS AvgGuestsServed
+FROM
+    Staff S
+LEFT JOIN
+    Reservation R ON S.StaffID = R.CustomerID AND R.IsCancelled = '0'
+GROUP BY
+    S.StaffID, S.FirstName, S.LastName;
+
+--Scenario 22: Retrieve the details of the restaurant with the most reservations
+SELECT *
+FROM Reservation R1
+WHERE NumGuests = (
+    SELECT MAX(NumGuests)
+    FROM Reservation R2
+    WHERE R1.RestaurantID = R2.RestaurantID
+);
+
+--Scenario 23: Retrieve the details of the restaurant with the highest average number of guests per reservation.
+SELECT *
+FROM Restaurant
+WHERE RestaurantID = (
+    SELECT RestaurantID
+    FROM (
+        SELECT RestaurantID, AVG(NumGuests) AS AvgGuests
+        FROM Reservation
+        GROUP BY RestaurantID
+        ORDER BY AVG(NumGuests) DESC
+        FETCH FIRST 1 ROW ONLY
+    ) Subquery
+);
